@@ -34,6 +34,7 @@ contract KoanProfile is
     mapping(address => PfpInfo) public userCurrentPfp;
 
     event PFUpdated(address indexed user, uint256 tokenId);
+    event MintPriceUpdated(uint256 oldPrice, uint256 newPrice);
 
     constructor(
         address initialOwner
@@ -51,6 +52,12 @@ contract KoanProfile is
 
     function unpause() public onlyOwner {
         _unpause();
+    }
+
+    function updateMintPriceUsd(uint256 newPrice) public onlyOwner {
+        uint256 oldPrice = mintPriceUsd;
+        mintPriceUsd = newPrice;
+        emit MintPriceUpdated(oldPrice, newPrice);
     }
 
     function safeMint(

@@ -26,6 +26,7 @@ contract KoanProtocolPass1155 is
     mapping(uint256 => bool) public validIds;
     mapping(address => mapping(uint256 => bool)) public hasMintId;
     mapping(uint256 => string) public eventNames;
+    mapping(address => bool) public canMint;
     uint256 public nextEventId;
 
     event EventCreated(uint256 indexed id, string name, uint256 timestamp);
@@ -45,35 +46,14 @@ contract KoanProtocolPass1155 is
         // );
     }
 
-    function setUri(string memory newuri) public onlyOwner {
-        _setURI(newuri);
-    }
-
-    function pause() public onlyOwner {
-        _pause();
-    }
-
-    function unpause() public onlyOwner {
-        _unpause();
-    }
-
-    /// @notice Owner creates new event type with a human-readable name
-    function addEvent(
-        string memory eventName
-    ) external onlyOwner returns (uint256) {
-        nextEventId++;
-        eventNames[nextEventId] = eventName;
-        validIds[nextEventId] = true;
-
-        emit EventCreated(nextEventId, eventName, block.timestamp);
-        return nextEventId;
-    }
-
+    // User Functions
     function mint(
         address account,
         uint256 id,
         bytes memory data
     ) public payable {
+        require(canMint[msg.sender], "Address not authorized to mint");
+        
         uint256 requiredEth = PriceFeed.getEthAmountFromUsd(
             dataFeed,
             mintPriceUsd
@@ -107,28 +87,7 @@ contract KoanProtocolPass1155 is
         );
     }
 
-    function mintBatch(
-        address to,
-        uint256[] memory ids,
-        uint256[] memory amounts,
-        bytes memory data
-    ) public onlyOwner {
-        _mintBatch(to, ids, amounts, data);
-    }
-
-    // The following functions are overrides required by Solidity.
-
-    function _update(
-        address from,
-        address to,
-        uint256[] memory ids,
-        uint256[] memory values
-    ) internal override(ERC1155, ERC1155Pausable, ERC1155Supply) {
-        super._update(from, to, ids, values);
-    }
-
     function getChainlinkDataFeedLatestAnswer() public view returns (int) {
-        
         return PriceFeed.getLatestPrice(dataFeed);
     }
 
@@ -139,5 +98,52 @@ contract KoanProtocolPass1155 is
         uint256 ethAmount = (mintPriceUsd * 1 ether) / uint256(price);
 
         return ethAmount;
+    }
+
+    // Admin Functions
+    function setUri(string memory newuri) public onlyOwner {
+        _setURI(newuri);
+    }
+
+    function pause() public onlyOwner {
+        _pause();
+    }
+
+    function unpause() public onlyOwner {
+        _unpause();
+    }
+
+    function addEvent(
+        string memory eventName
+    ) external onlyOwner returns (uint256) {
+        nextEventId++;
+        eventNames[nextEventId] = eventName;
+        validIds[nextEventId] = true;
+
+        emit EventCreated(nextEventId, eventName, block.timestamp);
+        return nextEventId;
+    }
+
+    function setCanMint(address user, bool _canMint) external onlyOwner {
+        canMint[user] = _canMint;
+    }
+
+    function mintBatch(
+        address to,
+        uint256[] memory ids,
+        uint256[] memory amounts,
+        bytes memory data
+    ) public onlyOwner {
+        _mintBatch(to, ids, amounts, data);
+    }
+
+    // Required Overrides
+    function _update(
+        address from,
+        address to,
+        uint256[] memory ids,
+        uint256[] memory values
+    ) internal override(ERC1155, ERC1155Pausable, ERC1155Supply) {
+        super._update(from, to, ids, values);
     }
 }
