@@ -39,7 +39,9 @@ contract KoanProfile is
     constructor(
         address initialOwner
     ) ERC721("KoanprotocolProfileAvatars", "KPPA") Ownable(initialOwner) {
-        dataFeed = 0x4aDC67696bA383F43DD60A9e78F2C97Fbbfc7cb1;
+        // https://docs.chain.link/data-feeds/price-feeds/addresses?page=1&testnetPage=1&network=base&search=eth-usd
+        // ETH / USD - BASEMAINNET
+        dataFeed = 0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70;
 
         // dataFeed = AggregatorV3Interface(
         //     0x4aDC67696bA383F43DD60A9e78F2C97Fbbfc7cb1
@@ -58,6 +60,10 @@ contract KoanProfile is
         uint256 oldPrice = mintPriceUsd;
         mintPriceUsd = newPrice;
         emit MintPriceUpdated(oldPrice, newPrice);
+    }
+
+    function updateDataFeed(address newDataFeed) external onlyOwner {
+        dataFeed = newDataFeed;
     }
 
     function safeMint(

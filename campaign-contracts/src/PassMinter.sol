@@ -128,6 +128,10 @@ contract KoanProtocolPass1155 is
         canMint[user] = _canMint;
     }
 
+    function updateDataFeed(address newDataFeed) external onlyOwner {
+        dataFeed = newDataFeed;
+    }
+
     function mintBatch(
         address to,
         uint256[] memory ids,
