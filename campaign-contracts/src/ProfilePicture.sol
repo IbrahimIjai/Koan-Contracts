@@ -8,6 +8,7 @@ import {ERC721Enumerable} from "@openzeppelin/contracts/token/ERC721/extensions/
 import {ERC721Pausable} from "@openzeppelin/contracts/token/ERC721/extensions/ERC721Pausable.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 import {Strings} from "@openzeppelin/contracts/utils/Strings.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {PriceFeed} from "./utils/PriceFeed.sol";
 
@@ -17,6 +18,7 @@ contract KoanProfile is
     ERC721URIStorage,
     ERC721Pausable,
     Ownable,
+    ReentrancyGuard,
     ERC721Burnable
 {
     using Strings for uint256;
@@ -77,7 +79,9 @@ contract KoanProfile is
         return tokenId;
     }
 
-    function mint(string memory uri) public payable returns (uint256) {
+    function mint(
+        string memory uri
+    ) public payable nonReentrant returns (uint256) {
         uint256 requiredEth = PriceFeed.getEthAmountFromUsd(
             dataFeed,
             mintPriceUsd
@@ -130,6 +134,10 @@ contract KoanProfile is
 
         bool success = token.transfer(owner(), balance);
         require(success, "Token transfer failed");
+    }
+
+    function withdrawAllEth() public onlyOwner {
+        payable(owner()).transfer(address(this).balance);
     }
 
     // The following functions are overrides required by Solidity.

@@ -8,6 +8,7 @@ import {ERC1155Burnable} from "@openzeppelin/contracts/token/ERC1155/extensions/
 import {ERC1155Pausable} from "@openzeppelin/contracts/token/ERC1155/extensions/ERC1155Pausable.sol";
 import {ERC1155Supply} from "@openzeppelin/contracts/token/ERC1155/extensions/ERC1155Supply.sol";
 import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
 import {PriceFeed} from "./utils/PriceFeed.sol";
 
 // import {AggregatorV3Interface} from "@chainlink/contracts/src/v0.8/shared/interfaces/AggregatorV3Interface.sol";
@@ -15,18 +16,20 @@ import {PriceFeed} from "./utils/PriceFeed.sol";
 contract KoanProtocolPass1155 is
     ERC1155,
     Ownable,
+    ReentrancyGuard,
     ERC1155Pausable,
     ERC1155Burnable,
     ERC1155Supply
 {
     // AggregatorV3Interface internal dataFeed;
     address public dataFeed;
+    address public operatorAddress;
     uint256 public mintPriceUsd = 50_000_000; //$0.5= 50_000_000/10e8
 
     mapping(uint256 => bool) public validIds;
     mapping(address => mapping(uint256 => bool)) public hasMintId;
     mapping(uint256 => string) public eventNames;
-    mapping(address => bool) public canMint;
+    mapping(address => mapping(uint256 => bool)) public canMint;
     uint256 public nextEventId;
 
     event EventCreated(uint256 indexed id, string name, uint256 timestamp);
@@ -38,22 +41,21 @@ contract KoanProtocolPass1155 is
         uint256 amount,
         uint256 pricePaid
     );
+    event OperatorAddressUpdated(address newOperator);
+    event MintPriceUpdated(uint256 oldPrice, uint256 newPrice);
 
     constructor(address initialOwner) ERC1155("") Ownable(initialOwner) {
-        dataFeed = 0x4aDC67696bA383F43DD60A9e78F2C97Fbbfc7cb1;
+        // ETH / USD - BASEMAINNET
+        dataFeed = 0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70;
         // dataFeed = AggregatorV3Interface(
         //     0x4aDC67696bA383F43DD60A9e78F2C97Fbbfc7cb1
         // );
     }
 
     // User Functions
-    function mint(
-        address account,
-        uint256 id,
-        bytes memory data
-    ) public payable {
-        require(canMint[msg.sender], "Address not authorized to mint");
-        
+    function mint(address account, uint256 id) public payable nonReentrant {
+        require(canMint[msg.sender][id], "Address not authorized to mint this ID");
+        bytes memory data = abi.encodePacked("Pass", msg.sender, id);
         uint256 requiredEth = PriceFeed.getEthAmountFromUsd(
             dataFeed,
             mintPriceUsd
@@ -105,6 +107,15 @@ contract KoanProtocolPass1155 is
         _setURI(newuri);
     }
 
+    function updateDataFeed(address newDataFeed) external onlyOwner {
+        dataFeed = newDataFeed;
+    }
+
+    function setOperatorAddress(address _operatorAddress) public onlyOwner {
+        operatorAddress = _operatorAddress;
+        emit OperatorAddressUpdated(_operatorAddress);
+    }
+
     function pause() public onlyOwner {
         _pause();
     }
@@ -124,12 +135,14 @@ contract KoanProtocolPass1155 is
         return nextEventId;
     }
 
-    function setCanMint(address user, bool _canMint) external onlyOwner {
-        canMint[user] = _canMint;
+    function updateMintPriceUsd(uint256 newPrice) public onlyOwner {
+        uint256 oldPrice = mintPriceUsd;
+        mintPriceUsd = newPrice;
+        emit MintPriceUpdated(oldPrice, newPrice);
     }
 
-    function updateDataFeed(address newDataFeed) external onlyOwner {
-        dataFeed = newDataFeed;
+    function setCanMint(address user, uint256 id, bool _canMint) external onlyOwner {
+        canMint[user][id] = _canMint;
     }
 
     function mintBatch(
