@@ -45,16 +45,16 @@ contract KoanProtocolPass1155 is
     event MintPriceUpdated(uint256 oldPrice, uint256 newPrice);
 
     constructor(address initialOwner) ERC1155("") Ownable(initialOwner) {
-        // ETH / USD - BASEMAINNET
+        // ETH / USD - BASEMAINNET CHAINLINK
         dataFeed = 0x71041dddad3595F9CEd3DcCFBe3D1F4b0a16Bb70;
-        // dataFeed = AggregatorV3Interface(
-        //     0x4aDC67696bA383F43DD60A9e78F2C97Fbbfc7cb1
-        // );
     }
 
     // User Functions
     function mint(address account, uint256 id) public payable nonReentrant {
-        require(canMint[msg.sender][id], "Address not authorized to mint this ID");
+        require(
+            canMint[msg.sender][id],
+            "Address not authorized to mint this ID"
+        );
         bytes memory data = abi.encodePacked("Pass", msg.sender, id);
         uint256 requiredEth = PriceFeed.getEthAmountFromUsd(
             dataFeed,
@@ -141,7 +141,12 @@ contract KoanProtocolPass1155 is
         emit MintPriceUpdated(oldPrice, newPrice);
     }
 
-    function setCanMint(address user, uint256 id, bool _canMint) external onlyOwner {
+    function setCanMint(
+        address user,
+        uint256 id,
+        bool _canMint
+    ) external onlyOwner {
+        require(validIds[id], "Invalid event ID");
         canMint[user][id] = _canMint;
     }
 

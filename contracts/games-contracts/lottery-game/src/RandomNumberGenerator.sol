@@ -6,10 +6,9 @@ import {VRFV2PlusClient} from "@chainlink/contracts/src/v0.8/vrf/dev/libraries/V
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import  "./interfaces/IKoanPlayLottery.sol";
+import "./interfaces/IKoanPlayLottery.sol";
 
 contract RandomNumberGenerator is VRFConsumerBaseV2Plus {
-
     using SafeERC20 for IERC20;
 
     address public admin;
@@ -17,14 +16,16 @@ contract RandomNumberGenerator is VRFConsumerBaseV2Plus {
     uint256 public latestLotteryId;
 
     // Your subscription ID.
-    uint256 public s_subscriptionId = 6186081890396611561502091541217131189152193495042567314668979054444665707478;
+    uint256 public s_subscriptionId =
+        72895049009068177567348429920655137314967903829166946862622665089352041121926;
 
     address public koanPlayLottery;
 
     // The gas lane to use, which specifies the maximum gas price to bump to.
     // For a list of available gas lanes on each network,
     // see https://docs.chain.link/vrf/v2-5/supported-networks#configurations
-    bytes32 public s_keyHash = 0x9e1344a1247c8a1785d0a4681a27152bffdb43666ae5bf7d14d24a5efd44bf71;
+    bytes32 public s_keyHash =
+        0x00b81b5a830cb0a4009fbd8904de511e28631e62ce5ad231373d3cdad373ccab;
 
     // Depends on the number of requested values that you want sent to the
     // fulfillRandomWords() function. Storing each word costs about 20,000 gas,
@@ -45,23 +46,26 @@ contract RandomNumberGenerator is VRFConsumerBaseV2Plus {
     uint32 public randomResult;
     uint256 public fee;
 
-
-     // Modifier to restrict functions to admin only
+    // Modifier to restrict functions to admin only
     modifier isAdmin() {
         require(msg.sender == admin, "Caller is not the admin");
         _;
     }
 
- // Modifier to restrict functions to admin only
+    // Modifier to restrict functions to admin only
     modifier isLotteryContract() {
-        require(msg.sender == koanPlayLottery || msg.sender == IKoanPlayLottery(koanPlayLottery).operatorAddress(), "Caller is not the koanPlayLottery");
+        require(
+            msg.sender == koanPlayLottery ||
+                msg.sender ==
+                IKoanPlayLottery(koanPlayLottery).operatorAddress(),
+            "Caller is not the koanPlayLottery"
+        );
         _;
     }
-   
 
- constructor(
+    constructor(
         address _vrfCoordinator
-    ) VRFConsumerBaseV2Plus(_vrfCoordinator){
+    ) VRFConsumerBaseV2Plus(_vrfCoordinator) {
         admin = msg.sender;
     }
 
@@ -85,8 +89,7 @@ contract RandomNumberGenerator is VRFConsumerBaseV2Plus {
         );
     }
 
-
-/**
+    /**
      * @notice Set the address for the koanPlayLottery
      * @param _koanPlayLottery: address of the koanPlayLottery contract
      */
@@ -107,8 +110,7 @@ contract RandomNumberGenerator is VRFConsumerBaseV2Plus {
         IERC20(_tokenAddress).safeTransfer(address(msg.sender), _tokenAmount);
     }
 
-
-     /**
+    /**
      * @notice Change the s_keyHash
      * @param _keyHash: new s_keyHash
      */
@@ -116,10 +118,27 @@ contract RandomNumberGenerator is VRFConsumerBaseV2Plus {
         s_keyHash = _keyHash;
     }
 
-      /**
+    /**
+     * @notice Change the VRF subscription ID
+     * @param _subscriptionId New subscription ID
+     */
+    function setSubscriptionId(uint256 _subscriptionId) external isAdmin {
+        s_subscriptionId = _subscriptionId;
+    }
+
+    /**
+     * @notice Update the VRF callback gas limit
+     * @param _callbackGasLimit New callback gas limit
+     */
+    function setCallbackGasLimit(uint32 _callbackGasLimit) external isAdmin {
+        require(_callbackGasLimit > 0, "Invalid gas limit");
+        callbackGasLimit = _callbackGasLimit;
+    }
+
+    /**
      * @notice View latestLotteryId
      */
-    
+
     function viewLatestLotteryId() external view returns (uint256) {
         return latestLotteryId;
     }
@@ -131,14 +150,17 @@ contract RandomNumberGenerator is VRFConsumerBaseV2Plus {
         return randomResult;
     }
 
-    function setLatestLotteryId(uint256 _latestLotteryId) external isLotteryContract{
+    function setLatestLotteryId(
+        uint256 _latestLotteryId
+    ) external isLotteryContract {
         latestLotteryId = _latestLotteryId;
     }
 
-     function fulfillRandomWords(uint256 requestId, uint256[] calldata randomWords) internal override {
-
+    function fulfillRandomWords(
+        uint256 requestId,
+        uint256[] calldata randomWords
+    ) internal override {
         require(latestRequestId == requestId, "Wrong requestId");
         randomResult = uint32(1000000 + (randomWords[0] % 1000000));
     }
-    
 }
