@@ -58,3 +58,12 @@
 [submodule "contracts/games-contracts/foundry-template/lib/forge-std"]
 	path = contracts/games-contracts/foundry-template/lib/forge-std
 	url = https://github.com/foundry-rs/forge-std
+[submodule "contracts/games-contracts/lottery-game/lib/chainlink-brownie-contracts"]
+	path = contracts/games-contracts/lottery-game/lib/chainlink-brownie-contracts
+	url = https://github.com/smartcontractkit/chainlink-brownie-contracts
+[submodule "contracts/games-contracts/lottery-game/lib/openzeppelin-contracts"]
+	path = contracts/games-contracts/lottery-game/lib/openzeppelin-contracts
+	url = https://github.com/OpenZeppelin/openzeppelin-contracts
+[submodule "contracts/games-contracts/lottery-game/lib/forge-std"]
+	path = contracts/games-contracts/lottery-game/lib/forge-std
+	url = https://github.com/foundry-rs/forge-std

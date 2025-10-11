@@ -1,66 +1,28 @@
-## Foundry
+Periodic checkpoint accuracy (Cloudflare vs Chainlink)
 
-**Foundry is a blazing fast, portable and modular toolkit for Ethereum application development written in Rust.**
+`Counter` tracks how early or late each periodic call was versus a fixed interval (default 5 minutes). Use it to evaluate Cloudflare Workers vs Chainlink Automation.
 
-Foundry consists of:
+Contract
 
-- **Forge**: Ethereum testing framework (like Truffle, Hardhat and DappTools).
-- **Cast**: Swiss army knife for interacting with EVM smart contracts, sending transactions and getting chain data.
-- **Anvil**: Local Ethereum node, akin to Ganache, Hardhat Network.
-- **Chisel**: Fast, utilitarian, and verbose solidity REPL.
+- File: `src/Counter.sol`
+- Constructor: `Counter(uint256 intervalSeconds)`; pass 0 to default to 300s
+- Call `checkpoint()` roughly every `interval` seconds
+- Inspect `records(i)` or `latestRecord()` to analyze accuracy
 
-## Documentation
+Run tests (requires Foundry)
 
-https://book.getfoundry.sh/
-
-## Usage
-
-### Build
-
-```shell
-$ forge build
+```bash
+forge test -vvv
 ```
 
-### Test
+Cloudflare Worker
 
-```shell
-$ forge test
-```
+- See `cloudflare-worker/`
+- Set ENV: RPC_URL, PRIVATE_KEY, CONTRACT_ADDRESS, CHAIN_ID
+- Cron: `*/5 * * * *`
 
-### Format
+Interpretation
 
-```shell
-$ forge fmt
-```
-
-### Gas Snapshots
-
-```shell
-$ forge snapshot
-```
-
-### Anvil
-
-```shell
-$ anvil
-```
-
-### Deploy
-
-```shell
-$ forge script script/Counter.s.sol:CounterScript --rpc-url <your_rpc_url> --private-key <your_private_key>
-```
-
-### Cast
-
-```shell
-$ cast <subcommand>
-```
-
-### Help
-
-```shell
-$ forge --help
-$ anvil --help
-$ cast --help
-```
+- offsetSeconds < 0: early by |offsetSeconds|
+- offsetSeconds > 0: late by offsetSeconds
+- Compare distributions across many intervals to decide if Workers suffice or if Automation is justified.
