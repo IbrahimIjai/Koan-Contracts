@@ -1,12 +1,11 @@
-// SPDX-License-Identifier: UNLICENSED
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.13;
 
-// Tracks how early/late periodic calls arrive versus a fixed interval.
-contract Counter {
+import "@openzeppelin/contracts/access/Ownable.sol";
+
+contract Counter is Ownable {
     uint256 public counter;
-
     uint256 public immutable interval;
-
     uint256 public lastTimestamp;
 
     struct AccuracyRecord {
@@ -27,8 +26,9 @@ contract Counter {
         address indexed caller
     );
 
-    constructor(uint256 _intervalSeconds) {
-        interval = _intervalSeconds == 0 ? 300 : _intervalSeconds;
+    constructor(uint256 _intervalSeconds) Ownable(msg.sender) {
+        require(_intervalSeconds >= 60, "Interval too small"); // Min 1min to prevent spam
+        interval = _intervalSeconds;
         lastTimestamp = block.timestamp;
         counter = 0;
     }
@@ -58,5 +58,9 @@ contract Counter {
     function latestRecord() external view returns (AccuracyRecord memory) {
         require(counter > 0, "NO_RECORDS");
         return records[counter];
+    }
+
+    function totalRecords() external view returns (uint256) {
+        return counter;
     }
 }
