@@ -1,15 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
-import "./interfaces/IRandomNumberGenerator.sol";
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
+import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IERC20Metadata} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Metadata.sol";
+import {IRandomNumberGenerator} from "./interfaces/IRandomNumberGenerator.sol";
 
 contract KoanPlayLottery is ReentrancyGuard, Ownable {
-
     using SafeERC20 for IERC20;
 
     address public injectorAddress;
@@ -72,29 +71,49 @@ contract KoanPlayLottery is ReentrancyGuard, Ownable {
     mapping(uint32 => uint32) private _bracketCalculator;
 
     // Keeps track of number of ticket per unique combination for each lotteryId
-    mapping(uint256 => mapping(uint32 => uint256)) private _numberTicketsPerLotteryId;
+    mapping(uint256 => mapping(uint32 => uint256))
+        private _numberTicketsPerLotteryId;
 
     // Keep track of user ticket ids for a given lotteryId
-    mapping(address => mapping(uint256 => uint256[])) private _userTicketIdsPerLotteryId;
+    mapping(address => mapping(uint256 => uint256[]))
+        private _userTicketIdsPerLotteryId;
 
     modifier notContract() {
-        require(!_isContract(msg.sender), "Contract not allowed");
-        require(msg.sender == tx.origin, "Proxy contract not allowed");
+        _notContract();
         _;
     }
 
     modifier onlyOperator() {
-        require(msg.sender == operatorAddress, "Not operator");
+        _onlyOperator();
         _;
     }
 
     modifier onlyOwnerOrInjector() {
-        require((msg.sender == owner()) || (msg.sender == injectorAddress), "Not owner or injector");
+        _onlyOwnerOrInjector();
         _;
     }
 
+    function _notContract() internal view {
+        require(!_isContract(msg.sender), "Contract not allowed");
+        require(msg.sender == tx.origin, "Proxy contract not allowed");
+    }
+
+    function _onlyOperator() internal view {
+        require(msg.sender == operatorAddress, "Not operator");
+    }
+
+    function _onlyOwnerOrInjector() internal view {
+        require(
+            (msg.sender == owner()) || (msg.sender == injectorAddress),
+            "Not owner or injector"
+        );
+    }
+
     event AdminTokenRecovery(address token, uint256 amount);
-    event LotteryClose(uint256 indexed lotteryId, uint256 firstTicketIdNextLottery);
+    event LotteryClose(
+        uint256 indexed lotteryId,
+        uint256 firstTicketIdNextLottery
+    );
     event LotteryInjection(uint256 indexed lotteryId, uint256 injectedAmount);
     event LotteryOpen(
         uint256 indexed lotteryId,
@@ -104,22 +123,41 @@ contract KoanPlayLottery is ReentrancyGuard, Ownable {
         uint256 firstTicketId,
         uint256 injectedAmount
     );
-    event LotteryNumberDrawn(uint256 indexed lotteryId, uint256 finalNumber, uint256 countWinningTickets);
-    event NewOperatorAndTreasuryAndInjectorAddresses(address operator, address treasury, address injector);
+    event LotteryNumberDrawn(
+        uint256 indexed lotteryId,
+        uint256 finalNumber,
+        uint256 countWinningTickets
+    );
+    event NewOperatorAndTreasuryAndInjectorAddresses(
+        address operator,
+        address treasury,
+        address injector
+    );
     event NewRandomGenerator(address indexed randomGenerator);
-    event TicketsPurchase(address indexed buyer, uint256 indexed lotteryId, uint256 numberTickets);
-    event TicketsClaim(address indexed claimer, uint256 amount, uint256 indexed lotteryId, uint256 numberTickets);
+    event TicketsPurchase(
+        address indexed buyer,
+        uint256 indexed lotteryId,
+        uint256 numberTickets
+    );
+    event TicketsClaim(
+        address indexed claimer,
+        uint256 amount,
+        uint256 indexed lotteryId,
+        uint256 numberTickets
+    );
 
-
-
-  constructor(address _paymentTokenAddress, address _randomNumberGeneratorAddress) Ownable(msg.sender) {
+    constructor(
+        address _paymentTokenAddress,
+        address _randomNumberGeneratorAddress
+    ) Ownable(msg.sender) {
         paymentToken = IERC20(_paymentTokenAddress);
-        randomNumberGenerator = IRandomNumberGenerator(_randomNumberGeneratorAddress);
+        randomNumberGenerator = IRandomNumberGenerator(
+            _randomNumberGeneratorAddress
+        );
         paymentTokenDecimals = IERC20Metadata(_paymentTokenAddress).decimals();
 
-        minPriceTicketInPaymentToken = 5 * 10**(paymentTokenDecimals - 2); // 0.05 in token decimals
-        maxPriceTicketInPaymentToken = 50 * 10**paymentTokenDecimals; // 50 in token decimals
-
+        minPriceTicketInPaymentToken = 5 * 10 ** (paymentTokenDecimals - 2); // 0.05 in token decimals
+        maxPriceTicketInPaymentToken = 50 * 10 ** paymentTokenDecimals; // 50 in token decimals
 
         // Initializes a mapping
         _bracketCalculator[0] = 1;
@@ -130,52 +168,84 @@ contract KoanPlayLottery is ReentrancyGuard, Ownable {
         _bracketCalculator[5] = 111111;
     }
 
-
-     /**
+    /**
      * @notice Buy tickets for the current lottery
      * @param _lotteryId: lotteryId
      * @param _ticketNumbers: array of ticket numbers between 1,000,000 and 1,999,999
      * @dev Callable by users
      */
-    function buyTickets(uint256 _lotteryId, uint32[] calldata _ticketNumbers)
-        external
-        notContract
-        nonReentrant
-    {
+    function buyTickets(
+        uint256 _lotteryId,
+        uint32[] calldata _ticketNumbers
+    ) external notContract nonReentrant {
         require(_ticketNumbers.length != 0, "No ticket specified");
-        require(_ticketNumbers.length <= maxNumberTicketsPerBuyOrClaim, "Too many tickets");
+        require(
+            _ticketNumbers.length <= maxNumberTicketsPerBuyOrClaim,
+            "Too many tickets"
+        );
 
-        require(_lotteries[_lotteryId].status == Status.Open, "Lottery is not open");
-        require(block.timestamp < _lotteries[_lotteryId].endTime, "Lottery is over");
+        require(
+            _lotteries[_lotteryId].status == Status.Open,
+            "Lottery is not open"
+        );
+        require(
+            block.timestamp < _lotteries[_lotteryId].endTime,
+            "Lottery is over"
+        );
 
         // Calculate number of PaymentToken to this contract
         uint256 amountPaymentTokenToTransfer = _calculateTotalPriceForBulkTickets(
-            _lotteries[_lotteryId].discountDivisor,
-            _lotteries[_lotteryId].priceTicketInPaymentToken,
-            _ticketNumbers.length
-        );
+                _lotteries[_lotteryId].discountDivisor,
+                _lotteries[_lotteryId].priceTicketInPaymentToken,
+                _ticketNumbers.length
+            );
 
         // Transfer payment tokens to this contract
-        paymentToken.safeTransferFrom(address(msg.sender), address(this), amountPaymentTokenToTransfer);
+        paymentToken.safeTransferFrom(
+            address(msg.sender),
+            address(this),
+            amountPaymentTokenToTransfer
+        );
 
         // Increment the total amount collected for the lottery round
-        _lotteries[_lotteryId].amountCollectedInPaymentToken += amountPaymentTokenToTransfer;
+        _lotteries[_lotteryId]
+            .amountCollectedInPaymentToken += amountPaymentTokenToTransfer;
 
         for (uint256 i = 0; i < _ticketNumbers.length; i++) {
             uint32 thisTicketNumber = _ticketNumbers[i];
 
-            require((thisTicketNumber >= 1000000) && (thisTicketNumber <= 1999999), "Outside range");
+            require(
+                (thisTicketNumber >= 1000000) && (thisTicketNumber <= 1999999),
+                "Outside range"
+            );
 
-            _numberTicketsPerLotteryId[_lotteryId][1 + (thisTicketNumber % 10)]++;
-            _numberTicketsPerLotteryId[_lotteryId][11 + (thisTicketNumber % 100)]++;
-            _numberTicketsPerLotteryId[_lotteryId][111 + (thisTicketNumber % 1000)]++;
-            _numberTicketsPerLotteryId[_lotteryId][1111 + (thisTicketNumber % 10000)]++;
-            _numberTicketsPerLotteryId[_lotteryId][11111 + (thisTicketNumber % 100000)]++;
-            _numberTicketsPerLotteryId[_lotteryId][111111 + (thisTicketNumber % 1000000)]++;
+            _numberTicketsPerLotteryId[_lotteryId][
+                1 + (thisTicketNumber % 10)
+            ]++;
+            _numberTicketsPerLotteryId[_lotteryId][
+                11 + (thisTicketNumber % 100)
+            ]++;
+            _numberTicketsPerLotteryId[_lotteryId][
+                111 + (thisTicketNumber % 1000)
+            ]++;
+            _numberTicketsPerLotteryId[_lotteryId][
+                1111 + (thisTicketNumber % 10000)
+            ]++;
+            _numberTicketsPerLotteryId[_lotteryId][
+                11111 + (thisTicketNumber % 100000)
+            ]++;
+            _numberTicketsPerLotteryId[_lotteryId][
+                111111 + (thisTicketNumber % 1000000)
+            ]++;
 
-            _userTicketIdsPerLotteryId[msg.sender][_lotteryId].push(currentTicketId);
+            _userTicketIdsPerLotteryId[msg.sender][_lotteryId].push(
+                currentTicketId
+            );
 
-            _tickets[currentTicketId] = Ticket({number: thisTicketNumber, owner: msg.sender});
+            _tickets[currentTicketId] = Ticket({
+                number: thisTicketNumber,
+                owner: msg.sender
+            });
 
             // Increase lottery ticket number
             currentTicketId++;
@@ -198,8 +268,14 @@ contract KoanPlayLottery is ReentrancyGuard, Ownable {
     ) external notContract nonReentrant {
         require(_ticketIds.length == _brackets.length, "Not same length");
         require(_ticketIds.length != 0, "Length must be >0");
-        require(_ticketIds.length <= maxNumberTicketsPerBuyOrClaim, "Too many tickets");
-        require(_lotteries[_lotteryId].status == Status.Claimable, "Lottery not claimable");
+        require(
+            _ticketIds.length <= maxNumberTicketsPerBuyOrClaim,
+            "Too many tickets"
+        );
+        require(
+            _lotteries[_lotteryId].status == Status.Claimable,
+            "Lottery not claimable"
+        );
 
         // Initializes the rewardInPaymentTokenToTransfer
         uint256 rewardInPaymentTokenToTransfer;
@@ -209,21 +285,38 @@ contract KoanPlayLottery is ReentrancyGuard, Ownable {
 
             uint256 thisTicketId = _ticketIds[i];
 
-            require(_lotteries[_lotteryId].firstTicketIdNextLottery > thisTicketId, "TicketId too high");
-            require(_lotteries[_lotteryId].firstTicketId <= thisTicketId, "TicketId too low");
-            require(msg.sender == _tickets[thisTicketId].owner, "Not the owner");
+            require(
+                _lotteries[_lotteryId].firstTicketIdNextLottery > thisTicketId,
+                "TicketId too high"
+            );
+            require(
+                _lotteries[_lotteryId].firstTicketId <= thisTicketId,
+                "TicketId too low"
+            );
+            require(
+                msg.sender == _tickets[thisTicketId].owner,
+                "Not the owner"
+            );
 
             // Update the lottery ticket owner to 0x address
             _tickets[thisTicketId].owner = address(0);
 
-            uint256 rewardForTicketId = _calculateRewardsForTicketId(_lotteryId, thisTicketId, _brackets[i]);
+            uint256 rewardForTicketId = _calculateRewardsForTicketId(
+                _lotteryId,
+                thisTicketId,
+                _brackets[i]
+            );
 
             // Check user is claiming the correct bracket
             require(rewardForTicketId != 0, "No prize for this bracket");
 
             if (_brackets[i] != 5) {
                 require(
-                    _calculateRewardsForTicketId(_lotteryId, thisTicketId, _brackets[i] + 1) == 0,
+                    _calculateRewardsForTicketId(
+                        _lotteryId,
+                        thisTicketId,
+                        _brackets[i] + 1
+                    ) == 0,
                     "Bracket must be higher"
                 );
             }
@@ -235,18 +328,30 @@ contract KoanPlayLottery is ReentrancyGuard, Ownable {
         // Transfer money to msg.sender
         paymentToken.safeTransfer(msg.sender, rewardInPaymentTokenToTransfer);
 
-        emit TicketsClaim(msg.sender, rewardInPaymentTokenToTransfer, _lotteryId, _ticketIds.length);
+        emit TicketsClaim(
+            msg.sender,
+            rewardInPaymentTokenToTransfer,
+            _lotteryId,
+            _ticketIds.length
+        );
     }
-
 
     /**
      * @notice Close lottery
      * @param _lotteryId: lottery id
      * @dev Callable by operator
      */
-    function closeLottery(uint256 _lotteryId) external  onlyOperator nonReentrant {
-        require(_lotteries[_lotteryId].status == Status.Open, "Lottery not open");
-        require(block.timestamp > _lotteries[_lotteryId].endTime, "Lottery not over");
+    function closeLottery(
+        uint256 _lotteryId
+    ) external onlyOperator nonReentrant {
+        require(
+            _lotteries[_lotteryId].status == Status.Open,
+            "Lottery not open"
+        );
+        require(
+            block.timestamp > _lotteries[_lotteryId].endTime,
+            "Lottery not over"
+        );
         _lotteries[_lotteryId].firstTicketIdNextLottery = currentTicketId;
 
         // Request a random number from the generator based on a seed
@@ -264,13 +369,18 @@ contract KoanPlayLottery is ReentrancyGuard, Ownable {
      * @param _autoInjection: reinjects funds into next lottery (vs. withdrawing all)
      * @dev Callable by operator
      */
-    function drawFinalNumberAndMakeLotteryClaimable(uint256 _lotteryId, bool _autoInjection)
-        external
-        onlyOperator
-        nonReentrant
-    {
-        require(_lotteries[_lotteryId].status == Status.Close, "Lottery not close");
-        require(_lotteryId == randomNumberGenerator.viewLatestLotteryId(), "Numbers not drawn");
+    function drawFinalNumberAndMakeLotteryClaimable(
+        uint256 _lotteryId,
+        bool _autoInjection
+    ) external onlyOperator nonReentrant {
+        require(
+            _lotteries[_lotteryId].status == Status.Close,
+            "Lottery not close"
+        );
+        require(
+            _lotteryId == randomNumberGenerator.viewLatestLotteryId(),
+            "Numbers not drawn"
+        );
 
         // Calculate the finalNumber based on the randomResult generated by ChainLink's fallback
         uint32 finalNumber = randomNumberGenerator.viewRandomResult();
@@ -280,7 +390,8 @@ contract KoanPlayLottery is ReentrancyGuard, Ownable {
 
         // Calculate the amount to share post-treasury fee
         uint256 amountToShareToWinners = (
-            ((_lotteries[_lotteryId].amountCollectedInPaymentToken) * (10000 - _lotteries[_lotteryId].treasuryFee))
+            ((_lotteries[_lotteryId].amountCollectedInPaymentToken) *
+                (10000 - _lotteries[_lotteryId].treasuryFee))
         ) / 10000;
 
         // Initializes the amount to withdraw to treasury
@@ -289,34 +400,43 @@ contract KoanPlayLottery is ReentrancyGuard, Ownable {
         // Calculate prizes in Payment token for each bracket by starting from the highest one
         for (uint32 i = 0; i < 6; i++) {
             uint32 j = 5 - i;
-            uint32 transformedWinningNumber = _bracketCalculator[j] + (finalNumber % (uint32(10)**(j + 1)));
+            uint32 transformedWinningNumber = _bracketCalculator[j] +
+                (finalNumber % (uint32(10) ** (j + 1)));
 
             _lotteries[_lotteryId].countWinnersPerBracket[j] =
-                _numberTicketsPerLotteryId[_lotteryId][transformedWinningNumber] -
+                _numberTicketsPerLotteryId[_lotteryId][
+                    transformedWinningNumber
+                ] -
                 numberAddressesInPreviousBracket;
 
             // A. If number of users for this _bracket number is superior to 0
             if (
-                (_numberTicketsPerLotteryId[_lotteryId][transformedWinningNumber] - numberAddressesInPreviousBracket) !=
-                0
+                (_numberTicketsPerLotteryId[_lotteryId][
+                    transformedWinningNumber
+                ] - numberAddressesInPreviousBracket) != 0
             ) {
                 // B. If rewards at this bracket are > 0, calculate, else, report the numberAddresses from previous bracket
                 if (_lotteries[_lotteryId].rewardsBreakdown[j] != 0) {
                     _lotteries[_lotteryId].rewardsPerBracket[j] =
-                        ((_lotteries[_lotteryId].rewardsBreakdown[j] * amountToShareToWinners) /
-                            (_numberTicketsPerLotteryId[_lotteryId][transformedWinningNumber] -
-                                numberAddressesInPreviousBracket)) /
+                        ((_lotteries[_lotteryId].rewardsBreakdown[j] *
+                            amountToShareToWinners) /
+                            (_numberTicketsPerLotteryId[_lotteryId][
+                                transformedWinningNumber
+                            ] - numberAddressesInPreviousBracket)) /
                         10000;
 
                     // Update numberAddressesInPreviousBracket
-                    numberAddressesInPreviousBracket = _numberTicketsPerLotteryId[_lotteryId][transformedWinningNumber];
+                    numberAddressesInPreviousBracket = _numberTicketsPerLotteryId[
+                        _lotteryId
+                    ][transformedWinningNumber];
                 }
                 // A. No payment Token to distribute, they are added to the amount to withdraw to treasury address
             } else {
                 _lotteries[_lotteryId].rewardsPerBracket[j] = 0;
 
                 amountToWithdrawToTreasury +=
-                    (_lotteries[_lotteryId].rewardsBreakdown[j] * amountToShareToWinners) /
+                    (_lotteries[_lotteryId].rewardsBreakdown[j] *
+                        amountToShareToWinners) /
                     10000;
             }
         }
@@ -330,30 +450,38 @@ contract KoanPlayLottery is ReentrancyGuard, Ownable {
             amountToWithdrawToTreasury = 0;
         }
 
-        amountToWithdrawToTreasury += (_lotteries[_lotteryId].amountCollectedInPaymentToken - amountToShareToWinners);
+        amountToWithdrawToTreasury += (_lotteries[_lotteryId]
+            .amountCollectedInPaymentToken - amountToShareToWinners);
 
         // Transfer PayementToken to treasury address
         paymentToken.safeTransfer(treasuryAddress, amountToWithdrawToTreasury);
 
-        emit LotteryNumberDrawn(currentLotteryId, finalNumber, numberAddressesInPreviousBracket);
+        emit LotteryNumberDrawn(
+            currentLotteryId,
+            finalNumber,
+            numberAddressesInPreviousBracket
+        );
     }
 
-
-      /**
+    /**
      * @notice Change the random generator
      * @dev The calls to functions are used to verify the new generator implements them properly.
      * It is necessary to wait for the VRF response before starting a round.
      * Callable only by the contract owner
      * @param _randomGeneratorAddress: address of the random generator
      */
-    function changeRandomGenerator(address _randomGeneratorAddress) external onlyOwner {
+    function changeRandomGenerator(
+        address _randomGeneratorAddress
+    ) external onlyOwner {
         require(
-            (currentLotteryId == 0) || (_lotteries[currentLotteryId].status == Status.Claimable),
+            (currentLotteryId == 0) ||
+                (_lotteries[currentLotteryId].status == Status.Claimable),
             "Lottery not in claimable"
         );
 
         // Request a random number from the generator based on a seed
-        IRandomNumberGenerator(_randomGeneratorAddress).getLotteryWinningNumber();
+        IRandomNumberGenerator(_randomGeneratorAddress)
+            .getLotteryWinningNumber();
 
         // Calculate the finalNumber based on the randomResult generated by ChainLink's fallback
         IRandomNumberGenerator(_randomGeneratorAddress).viewRandomResult();
@@ -369,10 +497,20 @@ contract KoanPlayLottery is ReentrancyGuard, Ownable {
      * @param _amount: amount to inject in Payment Tokn token
      * @dev Callable by owner or injector address
      */
-    function injectFunds(uint256 _lotteryId, uint256 _amount) external onlyOwnerOrInjector {
-        require(_lotteries[_lotteryId].status == Status.Open, "Lottery not open");
+    function injectFunds(
+        uint256 _lotteryId,
+        uint256 _amount
+    ) external onlyOwnerOrInjector {
+        require(
+            _lotteries[_lotteryId].status == Status.Open,
+            "Lottery not open"
+        );
 
-        paymentToken.safeTransferFrom(address(msg.sender), address(this), _amount);
+        paymentToken.safeTransferFrom(
+            address(msg.sender),
+            address(this),
+            _amount
+        );
         _lotteries[_lotteryId].amountCollectedInPaymentToken += _amount;
 
         emit LotteryInjection(_lotteryId, _amount);
@@ -395,21 +533,27 @@ contract KoanPlayLottery is ReentrancyGuard, Ownable {
         uint256 _treasuryFee
     ) external onlyOperator {
         require(
-            (currentLotteryId == 0) || (_lotteries[currentLotteryId].status == Status.Claimable),
+            (currentLotteryId == 0) ||
+                (_lotteries[currentLotteryId].status == Status.Claimable),
             "Not time to start lottery"
         );
 
         require(
-            ((_endTime - block.timestamp) > MIN_LENGTH_LOTTERY) && ((_endTime - block.timestamp) < MAX_LENGTH_LOTTERY),
+            ((_endTime - block.timestamp) > MIN_LENGTH_LOTTERY) &&
+                ((_endTime - block.timestamp) < MAX_LENGTH_LOTTERY),
             "Lottery length outside of range"
         );
 
         require(
-            (_priceTicketInPaymentToken >= minPriceTicketInPaymentToken) && (_priceTicketInPaymentToken <= maxPriceTicketInPaymentToken),
+            (_priceTicketInPaymentToken >= minPriceTicketInPaymentToken) &&
+                (_priceTicketInPaymentToken <= maxPriceTicketInPaymentToken),
             "Outside of limits"
         );
 
-        require(_discountDivisor >= MIN_DISCOUNT_DIVISOR, "Discount divisor too low");
+        require(
+            _discountDivisor >= MIN_DISCOUNT_DIVISOR,
+            "Discount divisor too low"
+        );
         require(_treasuryFee <= MAX_TREASURY_FEE, "Treasury fee too high");
 
         require(
@@ -421,10 +565,12 @@ contract KoanPlayLottery is ReentrancyGuard, Ownable {
                 _rewardsBreakdown[5]) == 10000,
             "Rewards must equal 10000"
         );
-    
+
         currentLotteryId++;
 
-        IRandomNumberGenerator(randomNumberGenerator).setLatestLotteryId(currentLotteryId);
+        IRandomNumberGenerator(randomNumberGenerator).setLatestLotteryId(
+            currentLotteryId
+        );
 
         _lotteries[currentLotteryId] = Lottery({
             status: Status.Open,
@@ -434,8 +580,22 @@ contract KoanPlayLottery is ReentrancyGuard, Ownable {
             discountDivisor: _discountDivisor,
             rewardsBreakdown: _rewardsBreakdown,
             treasuryFee: _treasuryFee,
-            rewardsPerBracket: [uint256(0), uint256(0), uint256(0), uint256(0), uint256(0), uint256(0)],
-            countWinnersPerBracket: [uint256(0), uint256(0), uint256(0), uint256(0), uint256(0), uint256(0)],
+            rewardsPerBracket: [
+                uint256(0),
+                uint256(0),
+                uint256(0),
+                uint256(0),
+                uint256(0),
+                uint256(0)
+            ],
+            countWinnersPerBracket: [
+                uint256(0),
+                uint256(0),
+                uint256(0),
+                uint256(0),
+                uint256(0),
+                uint256(0)
+            ],
             firstTicketId: currentTicketId,
             firstTicketIdNextLottery: currentTicketId,
             amountCollectedInPaymentToken: pendingInjectionNextLottery,
@@ -454,14 +614,20 @@ contract KoanPlayLottery is ReentrancyGuard, Ownable {
         pendingInjectionNextLottery = 0;
     }
 
-   /**
+    /**
      * @notice It allows the admin to recover wrong tokens sent to the contract
      * @param _tokenAddress: the address of the token to withdraw
      * @param _tokenAmount: the number of token amount to withdraw
      * @dev Only callable by owner.
      */
-    function recoverWrongTokens(address _tokenAddress, uint256 _tokenAmount) external onlyOwner {
-        require(_tokenAddress != address(paymentToken), "Cannot be PaymentToken token");
+    function recoverWrongTokens(
+        address _tokenAddress,
+        uint256 _tokenAmount
+    ) external onlyOwner {
+        require(
+            _tokenAddress != address(paymentToken),
+            "Cannot be PaymentToken token"
+        );
 
         IERC20(_tokenAddress).safeTransfer(address(msg.sender), _tokenAmount);
 
@@ -474,11 +640,14 @@ contract KoanPlayLottery is ReentrancyGuard, Ownable {
      * @param _minPriceTicketInPaymentToken: minimum price of a ticket in PaymentToken
      * @param _maxPriceTicketInPaymentToken: maximum price of a ticket in PaymentToken
      */
-    function setMinAndMaxTicketPriceInPaymentToken(uint256 _minPriceTicketInPaymentToken, uint256 _maxPriceTicketInPaymentToken)
-        external
-        onlyOwner
-    {
-        require(_minPriceTicketInPaymentToken <= _maxPriceTicketInPaymentToken, "minPrice must be < maxPrice");
+    function setMinAndMaxTicketPriceInPaymentToken(
+        uint256 _minPriceTicketInPaymentToken,
+        uint256 _maxPriceTicketInPaymentToken
+    ) external onlyOwner {
+        require(
+            _minPriceTicketInPaymentToken <= _maxPriceTicketInPaymentToken,
+            "minPrice must be < maxPrice"
+        );
 
         minPriceTicketInPaymentToken = _minPriceTicketInPaymentToken;
         maxPriceTicketInPaymentToken = _maxPriceTicketInPaymentToken;
@@ -488,7 +657,9 @@ contract KoanPlayLottery is ReentrancyGuard, Ownable {
      * @notice Set max number of tickets
      * @dev Only callable by owner
      */
-    function setMaxNumberTicketsPerBuy(uint256 _maxNumberTicketsPerBuy) external onlyOwner {
+    function setMaxNumberTicketsPerBuy(
+        uint256 _maxNumberTicketsPerBuy
+    ) external onlyOwner {
         require(_maxNumberTicketsPerBuy != 0, "Must be > 0");
         maxNumberTicketsPerBuyOrClaim = _maxNumberTicketsPerBuy;
     }
@@ -513,7 +684,11 @@ contract KoanPlayLottery is ReentrancyGuard, Ownable {
         treasuryAddress = _treasuryAddress;
         injectorAddress = _injectorAddress;
 
-        emit NewOperatorAndTreasuryAndInjectorAddresses(_operatorAddress, _treasuryAddress, _injectorAddress);
+        emit NewOperatorAndTreasuryAndInjectorAddresses(
+            _operatorAddress,
+            _treasuryAddress,
+            _injectorAddress
+        );
     }
 
     /**
@@ -527,16 +702,24 @@ contract KoanPlayLottery is ReentrancyGuard, Ownable {
         uint256 _priceTicket,
         uint256 _numberTickets
     ) external pure returns (uint256) {
-        require(_discountDivisor >= MIN_DISCOUNT_DIVISOR, "Must be >= MIN_DISCOUNT_DIVISOR");
+        require(
+            _discountDivisor >= MIN_DISCOUNT_DIVISOR,
+            "Must be >= MIN_DISCOUNT_DIVISOR"
+        );
         require(_numberTickets != 0, "Number of tickets must be > 0");
 
-        return _calculateTotalPriceForBulkTickets(_discountDivisor, _priceTicket, _numberTickets);
+        return
+            _calculateTotalPriceForBulkTickets(
+                _discountDivisor,
+                _priceTicket,
+                _numberTickets
+            );
     }
 
     /**
      * @notice View current lottery id
      */
-    function viewCurrentLotteryId() external view  returns (uint256) {
+    function viewCurrentLotteryId() external view returns (uint256) {
         return currentLotteryId;
     }
 
@@ -544,7 +727,9 @@ contract KoanPlayLottery is ReentrancyGuard, Ownable {
      * @notice View lottery information
      * @param _lotteryId: lottery id
      */
-    function viewLottery(uint256 _lotteryId) external view returns (Lottery memory) {
+    function viewLottery(
+        uint256 _lotteryId
+    ) external view returns (Lottery memory) {
         return _lotteries[_lotteryId];
     }
 
@@ -552,11 +737,9 @@ contract KoanPlayLottery is ReentrancyGuard, Ownable {
      * @notice View ticker statuses and numbers for an array of ticket ids
      * @param _ticketIds: array of _ticketId
      */
-    function viewNumbersAndStatusesForTicketIds(uint256[] calldata _ticketIds)
-        external
-        view
-        returns (uint32[] memory, bool[] memory)
-    {
+    function viewNumbersAndStatusesForTicketIds(
+        uint256[] calldata _ticketIds
+    ) external view returns (uint32[] memory, bool[] memory) {
         uint256 length = _ticketIds.length;
         uint32[] memory ticketNumbers = new uint32[](length);
         bool[] memory ticketStatuses = new bool[](length);
@@ -573,7 +756,7 @@ contract KoanPlayLottery is ReentrancyGuard, Ownable {
         return (ticketNumbers, ticketStatuses);
     }
 
-     /**
+    /**
      * @notice View rewards for a given ticket, providing a bracket, and lottery id
      * @dev Computations are mostly offchain. This is used to verify a ticket!
      * @param _lotteryId: lottery id
@@ -616,15 +799,12 @@ contract KoanPlayLottery is ReentrancyGuard, Ownable {
     )
         external
         view
-        returns (
-            uint256[] memory,
-            uint32[] memory,
-            bool[] memory,
-            uint256
-        )
+        returns (uint256[] memory, uint32[] memory, bool[] memory, uint256)
     {
         uint256 length = _size;
-        uint256 numberTicketsBoughtAtLotteryId = _userTicketIdsPerLotteryId[_user][_lotteryId].length;
+        uint256 numberTicketsBoughtAtLotteryId = _userTicketIdsPerLotteryId[
+            _user
+        ][_lotteryId].length;
 
         if (length > (numberTicketsBoughtAtLotteryId - _cursor)) {
             length = numberTicketsBoughtAtLotteryId - _cursor;
@@ -635,7 +815,9 @@ contract KoanPlayLottery is ReentrancyGuard, Ownable {
         bool[] memory ticketStatuses = new bool[](length);
 
         for (uint256 i = 0; i < length; i++) {
-            lotteryTicketIds[i] = _userTicketIdsPerLotteryId[_user][_lotteryId][i + _cursor];
+            lotteryTicketIds[i] = _userTicketIdsPerLotteryId[_user][_lotteryId][
+                i + _cursor
+            ];
             ticketNumbers[i] = _tickets[lotteryTicketIds[i]].number;
 
             // True = ticket claimed
@@ -647,17 +829,21 @@ contract KoanPlayLottery is ReentrancyGuard, Ownable {
             }
         }
 
-        return (lotteryTicketIds, ticketNumbers, ticketStatuses, _cursor + length);
+        return (
+            lotteryTicketIds,
+            ticketNumbers,
+            ticketStatuses,
+            _cursor + length
+        );
     }
 
-
- /**
+    /**
      * @notice Calculate rewards for a given ticket
      * @param _lotteryId: lottery id
      * @param _ticketId: ticket id
      * @param _bracket: bracket for the ticketId to verify the claim and calculate rewards
      */
-     
+
     function _calculateRewardsForTicketId(
         uint256 _lotteryId,
         uint256 _ticketId,
@@ -671,9 +857,10 @@ contract KoanPlayLottery is ReentrancyGuard, Ownable {
 
         // Apply transformation to verify the claim provided by the user is true
         uint32 transformedWinningNumber = _bracketCalculator[_bracket] +
-            (winningTicketNumber % (uint32(10)**(_bracket + 1)));
+            (winningTicketNumber % (uint32(10) ** (_bracket + 1)));
 
-        uint32 transformedUserNumber = _bracketCalculator[_bracket] + (userNumber % (uint32(10)**(_bracket + 1)));
+        uint32 transformedUserNumber = _bracketCalculator[_bracket] +
+            (userNumber % (uint32(10) ** (_bracket + 1)));
 
         // Confirm that the two transformed numbers are the same, if not throw
         if (transformedWinningNumber == transformedUserNumber) {
@@ -695,10 +882,13 @@ contract KoanPlayLottery is ReentrancyGuard, Ownable {
         uint256 _priceTicket,
         uint256 _numberTickets
     ) internal pure returns (uint256) {
-        return (_priceTicket * _numberTickets * (_discountDivisor + 1 - _numberTickets)) / _discountDivisor;
+        return
+            (_priceTicket *
+                _numberTickets *
+                (_discountDivisor + 1 - _numberTickets)) / _discountDivisor;
     }
 
-      /**
+    /**
      * @notice Check if an address is a contract
      */
     function _isContract(address _addr) internal view returns (bool) {

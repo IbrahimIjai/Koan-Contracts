@@ -4,9 +4,9 @@ pragma solidity ^0.8.20;
 import {VRFConsumerBaseV2Plus} from "@chainlink/contracts/src/v0.8/vrf/dev/VRFConsumerBaseV2Plus.sol";
 import {VRFV2PlusClient} from "@chainlink/contracts/src/v0.8/vrf/dev/libraries/VRFV2PlusClient.sol";
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "./interfaces/IKoanPlayLottery.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import {IKoanPlayLottery} from "./interfaces/IKoanPlayLottery.sol";
 
 contract RandomNumberGenerator is VRFConsumerBaseV2Plus {
     using SafeERC20 for IERC20;
@@ -16,7 +16,7 @@ contract RandomNumberGenerator is VRFConsumerBaseV2Plus {
     uint256 public latestLotteryId;
 
     // Your subscription ID.
-    uint256 public s_subscriptionId =
+    uint256 public sSubscriptionId =
         72895049009068177567348429920655137314967903829166946862622665089352041121926;
 
     address public koanPlayLottery;
@@ -24,7 +24,7 @@ contract RandomNumberGenerator is VRFConsumerBaseV2Plus {
     // The gas lane to use, which specifies the maximum gas price to bump to.
     // For a list of available gas lanes on each network,
     // see https://docs.chain.link/vrf/v2-5/supported-networks#configurations
-    bytes32 public s_keyHash =
+    bytes32 public sKeyHash =
         0x00b81b5a830cb0a4009fbd8904de511e28631e62ce5ad231373d3cdad373ccab;
 
     // Depends on the number of requested values that you want sent to the
@@ -48,19 +48,27 @@ contract RandomNumberGenerator is VRFConsumerBaseV2Plus {
 
     // Modifier to restrict functions to admin only
     modifier isAdmin() {
-        require(msg.sender == admin, "Caller is not the admin");
+        _isAdmin();
         _;
     }
 
     // Modifier to restrict functions to admin only
     modifier isLotteryContract() {
+        _isLotteryContract();
+        _;
+    }
+
+    function _isAdmin() internal view {
+        require(msg.sender == admin, "Caller is not the admin");
+    }
+
+    function _isLotteryContract() internal view {
         require(
             msg.sender == koanPlayLottery ||
                 msg.sender ==
                 IKoanPlayLottery(koanPlayLottery).operatorAddress(),
             "Caller is not the koanPlayLottery"
         );
-        _;
     }
 
     constructor(
@@ -71,13 +79,13 @@ contract RandomNumberGenerator is VRFConsumerBaseV2Plus {
 
     function getLotteryWinningNumber() external {
         require(msg.sender == koanPlayLottery, "Only koanPlayLottery");
-        require(s_keyHash != bytes32(0), "Must have valid key hash");
+        require(sKeyHash != bytes32(0), "Must have valid key hash");
 
         // Will revert if subscription is not set and funded.
         latestRequestId = s_vrfCoordinator.requestRandomWords(
             VRFV2PlusClient.RandomWordsRequest({
-                keyHash: s_keyHash,
-                subId: s_subscriptionId,
+                keyHash: sKeyHash,
+                subId: sSubscriptionId,
                 requestConfirmations: requestConfirmations,
                 callbackGasLimit: callbackGasLimit,
                 numWords: numWords,
@@ -115,7 +123,7 @@ contract RandomNumberGenerator is VRFConsumerBaseV2Plus {
      * @param _keyHash: new s_keyHash
      */
     function setKeyHash(bytes32 _keyHash) external isAdmin {
-        s_keyHash = _keyHash;
+        sKeyHash = _keyHash;
     }
 
     /**
@@ -123,7 +131,7 @@ contract RandomNumberGenerator is VRFConsumerBaseV2Plus {
      * @param _subscriptionId New subscription ID
      */
     function setSubscriptionId(uint256 _subscriptionId) external isAdmin {
-        s_subscriptionId = _subscriptionId;
+        sSubscriptionId = _subscriptionId;
     }
 
     /**
