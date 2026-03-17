@@ -1,7 +1,7 @@
 import { HardhatRuntimeEnvironment } from "hardhat/types";
 import { DeployFunction } from "hardhat-deploy/dist/types";
 
-const WNATIVE_ADDRESS = "0x4200000000000000000000000000000000000006";
+const WNATIVE_ADDRESS = "0x5Ac881DF30b6F9d1b8c370Dc493B4A1B2c8bCCd2";
 
 const func: DeployFunction = async function ({ ethers, getNamedAccounts, deployments }: HardhatRuntimeEnvironment) {
   const { deploy } = deployments;
@@ -26,7 +26,7 @@ const func: DeployFunction = async function ({ ethers, getNamedAccounts, deploym
 
   const NFTDescriptor = await deployments.get("NFTDescriptor");
 
-  const nativeCurrencyLabelBytes = ethers.utils.formatBytes32String("ETH");
+  const nativeCurrencyLabelBytes = ethers.utils.formatBytes32String("PAS");
 
   console.log(
     "Deploying NonfungibleTokenPositionDescriptor... ",
@@ -34,13 +34,13 @@ const func: DeployFunction = async function ({ ethers, getNamedAccounts, deploym
     nativeCurrencyLabelBytes,
     NFTDescriptor.address,
     {
-      args: [WNATIVE_ADDRESS, asciiStringToBytes32("ETH")],
+      args: [WNATIVE_ADDRESS, asciiStringToBytes32("PAS")],
     },
   );
 
   await deploy("NonfungibleTokenPositionDescriptor", {
     from: deployer,
-    args: [WNATIVE_ADDRESS, asciiStringToBytes32("ETH")],
+    args: [WNATIVE_ADDRESS, asciiStringToBytes32("PAS")],
     log: true,
     deterministicDeployment: false,
     libraries: {

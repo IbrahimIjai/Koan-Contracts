@@ -3,31 +3,42 @@ dotenv.config();
 import { HardhatUserConfig } from "hardhat/config";
 import "@nomicfoundation/hardhat-toolbox";
 import "hardhat-deploy";
-import "@matterlabs/hardhat-zksync-solc";
-import "@matterlabs/hardhat-zksync-verify";
+// import "@matterlabs/hardhat-zksync-solc";
+// import "@matterlabs/hardhat-zksync-verify";
 
 const providerApiKey = process.env.ALCHEMY_API_KEY || "oKxs-03sij-U_N0iOlrSsZFr29-IqbuF";
-const deployerPrivateKey = process.env.DEPLOYER_PRIVATE_KEY;
+export const deployerPrivateKey = process.env.DEPLOYER_PRIVATE_KEY;
 // const etherscanApiKey = process.env.ETHERSCAN_API_KEY;
 const basescanApiKey = process.env.BASESCAN_API_KEY;
 
 const config: HardhatUserConfig = {
   solidity: {
-    version: "0.7.6",
-    settings: {
-      optimizer: {
-        enabled: true,
-        runs: 800,
+    compilers: [
+      {
+        version: "0.8.28",
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 200,
+          },
+          viaIR: true,
+        },
       },
-      metadata: {
-        // do not include the metadata hash, since this is machine dependent
-        // and we want all generated code to be deterministic
-        // https://docs.soliditylang.org/en/v0.7.6/metadata.html
-        bytecodeHash: "none",
+      {
+        version: "0.7.6",
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 800,
+          },
+          metadata: {
+            bytecodeHash: "none",
+          },
+        },
       },
-    },
+    ],
   },
-  defaultNetwork: "lisk-sepolia",
+  defaultNetwork: "hardhat",
   // defaultNetwork: "hardhat",
   namedAccounts: {
     // deployer: {
@@ -37,7 +48,6 @@ const config: HardhatUserConfig = {
     //   default: "0xE3c347cEa95B7BfdB921074bdb39b8571F905f6D",
     // },
     deployer: {
-      // By default, it will take the first Hardhat account as the deployer
       default: 0,
     },
     alice: {
@@ -59,56 +69,38 @@ const config: HardhatUserConfig = {
   networks: {
     hardhat: {
       forking: {
-        url: `https://eth-mainnet.alchemyapi.io/v2/${providerApiKey}`,
+        url: `https://rpc.flashbots.net`,
         enabled: process.env.MAINNET_FORKING_ENABLED === "true",
       },
+    },
+    polkadotTestnet: {
+      url: "https://services.polkadothub-rpc.com/testnet",
+      chainId: 420420417,
+      accounts: [deployerPrivateKey!],
     },
     base: {
       url: "https://mainnet.base.org",
       accounts: [deployerPrivateKey!],
-      verify: {
-        etherscan: {
-          apiUrl: "https://api.basescan.org/api",
-          apiKey: basescanApiKey,
-        },
-      },
     },
     baseSepolia: {
       url: "https://sepolia.base.org",
       accounts: [deployerPrivateKey!],
-      verify: {
-        etherscan: {
-          apiUrl: "https://api-sepolia.basescan.org",
-          apiKey: basescanApiKey,
-        },
-      },
-    },
-    "lisk-sepolia": {
-      url: "https://rpc.sepolia-api.lisk.com",
-      accounts: [deployerPrivateKey!],
-      gasPrice: 1000000000,
-      verify: {
-        etherscan: {
-          apiKey: "123",
-          apiUrl: "https://sepolia-blockscout.lisk.com/api",
-        },
-      },
-    },
-    lisk: {
-      url: "https://rpc.api.lisk.com",
-      accounts: [deployerPrivateKey!],
-      gasPrice: 1000000000,
-    },
-    sepolia: {
-      url: `https://eth-sepolia.g.alchemy.com/v2/${providerApiKey}`,
-      accounts: [deployerPrivateKey!],
     },
   },
-  verify: {
-    etherscan: {
-      // apiKey: `${etherscanApiKey}`,
-      apiKey: "123",
+  etherscan: {
+    apiKey: {
+      polkadotTestnet: "no-api-key-needed",
     },
+    customChains: [
+      {
+        network: "polkadotTestnet",
+        chainId: 420420417,
+        urls: {
+          apiURL: "https://blockscout-testnet.polkadot.io/api",
+          browserURL: "https://blockscout-testnet.polkadot.io/",
+        },
+      },
+    ],
   },
 };
 

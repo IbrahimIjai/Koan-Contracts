@@ -3,8 +3,8 @@ dotenv.config();
 import { HardhatUserConfig } from "hardhat/config";
 import "@nomicfoundation/hardhat-toolbox";
 import "hardhat-deploy";
-import "@matterlabs/hardhat-zksync-solc";
-import "@matterlabs/hardhat-zksync-verify";
+// import "@matterlabs/hardhat-zksync-solc";
+// import "@matterlabs/hardhat-zksync-verify";
 
 const LOW_OPTIMIZER_COMPILER_SETTINGS = {
   version: "0.7.6",
@@ -55,13 +55,46 @@ const basescanApiKey = process.env.BASESCAN_API_KEY;
 
 const config: HardhatUserConfig = {
   solidity: {
-    compilers: [DEFAULT_COMPILER_SETTINGS],
+    compilers: [
+      {
+        version: "0.7.6",
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 1000000,
+          },
+          metadata: {
+            bytecodeHash: "none",
+          },
+        },
+      },
+      {
+        version: "0.8.28",
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 200,
+          },
+          viaIR: true,
+        },
+      },
+    ],
     overrides: {
       "contracts/NonfungiblePositionManager.sol": LOW_OPTIMIZER_COMPILER_SETTINGS,
       "contracts/test/MockTimeNonfungiblePositionManager.sol": LOW_OPTIMIZER_COMPILER_SETTINGS,
       "contracts/test/NFTDescriptorTest.sol": LOWEST_OPTIMIZER_COMPILER_SETTINGS,
       "contracts/NonfungibleTokenPositionDescriptor.sol": LOWEST_OPTIMIZER_COMPILER_SETTINGS,
       "contracts/libraries/NFTDescriptor.sol": LOWEST_OPTIMIZER_COMPILER_SETTINGS,
+      "contracts/WPES.sol": {
+        version: "0.8.28",
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 200,
+          },
+          viaIR: true,
+        },
+      },
     },
   },
   defaultNetwork: "baseSepolia",
@@ -127,18 +160,27 @@ const config: HardhatUserConfig = {
     baseSepolia: {
       url: "https://sepolia.base.org",
       accounts: [deployerPrivateKey!],
-      verify: {
-        etherscan: {
-          apiUrl: "https://api-sepolia.basescan.org",
-          apiKey: basescanApiKey,
-        },
-      },
+    },
+    polkadotTestnet: {
+      url: "https://services.polkadothub-rpc.com/testnet",
+      chainId: 420420417,
+      accounts: [deployerPrivateKey!],
     },
   },
-  verify: {
-    etherscan: {
-      apiKey: `${etherscanApiKey}`,
+  etherscan: {
+    apiKey: {
+      polkadotTestnet: "no-api-key-needed",
     },
+    customChains: [
+      {
+        network: "polkadotTestnet",
+        chainId: 420420417,
+        urls: {
+          apiURL: "https://blockscout-testnet.polkadot.io/api",
+          browserURL: "https://blockscout-testnet.polkadot.io/",
+        },
+      },
+    ],
   },
 };
 
