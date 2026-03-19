@@ -68,16 +68,6 @@ const config: HardhatUserConfig = {
           },
         },
       },
-      {
-        version: "0.8.28",
-        settings: {
-          optimizer: {
-            enabled: true,
-            runs: 200,
-          },
-          viaIR: true,
-        },
-      },
     ],
     overrides: {
       "contracts/NonfungiblePositionManager.sol": LOW_OPTIMIZER_COMPILER_SETTINGS,
@@ -181,6 +171,9 @@ const config: HardhatUserConfig = {
         },
       },
     ],
+  },
+  gasReporter: {
+    enabled: process.env.REPORT_GAS === "true",
   },
 };
 
