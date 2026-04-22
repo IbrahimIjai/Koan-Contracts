@@ -13,9 +13,25 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const { deploy } = deployments;
 
   const { deployer } = await getNamedAccounts();
-  // const chainId = await getChainId();
-  if (!process.env.WNATIVE_ADDRESS) {
-    throw Error(`No WNATIVE_ADDRESS for chain #}!`);
+  const chainId = await getChainId();
+  let factoryAddress = process.env.FACTORY_ADDRESS;
+  let wnativeAddress = process.env.WNATIVE_ADDRESS;
+
+  if (chainId === "42220") {
+    // Celo Mainnet
+    wnativeAddress = "0x0000000000000000000000000000000000000000";
+  }
+
+  // Fallback to deployments if not provided in env
+  if (!factoryAddress) {
+    const factoryDeployment = await deployments.getOrNull("UniswapV3Factory");
+    if (factoryDeployment) {
+      factoryAddress = factoryDeployment.address;
+    }
+  }
+
+  if (!factoryAddress || !wnativeAddress) {
+    throw Error(`No FACTORY_ADDRESS or WNATIVE_ADDRESS for chain #${chainId}!`);
   }
 
   const v3Migrator = await hre.artifacts.readArtifact("V3Migrator");
@@ -27,7 +43,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
       bytecode: v3Migrator.bytecode,
       abi: v3Migrator.abi,
     },
-    args: [FACTORY_ADDRESS, process.env.WNATIVE_ADDRESS, NonfungiblePositionManager.address],
+    args: [factoryAddress, wnativeAddress, NonfungiblePositionManager.address],
     log: true,
     deterministicDeployment: false,
   });

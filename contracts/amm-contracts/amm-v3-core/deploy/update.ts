@@ -16,7 +16,12 @@ const func: DeployFunction = async function ({
     UniswapV3Factory: UniswapV3Factory.address,
   };
 
-  fs.writeFileSync(`../deployments/v3core/${network.name + "_" + chainId}.json`, JSON.stringify(contracts, null, 2));
+  const dir = `../deployments/v3core`;
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+
+  fs.writeFileSync(`${dir}/${network.name + "_" + chainId}.json`, JSON.stringify(contracts, null, 2));
 };
 
 export default func;

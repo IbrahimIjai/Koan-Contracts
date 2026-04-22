@@ -30,10 +30,12 @@ const func: DeployFunction = async function ({
     QuoterV2: QuoterV2.address,
   };
 
-  fs.writeFileSync(
-    `../deployments/v3periphery/${network.name + "_" + chainId}.json`,
-    JSON.stringify(contracts, null, 2),
-  );
+  const dir = `../deployments/v3periphery`;
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
+
+  fs.writeFileSync(`${dir}/${network.name + "_" + chainId}.json`, JSON.stringify(contracts, null, 2));
 };
 
 export default func;

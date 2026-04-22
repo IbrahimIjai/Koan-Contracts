@@ -8,10 +8,19 @@ const func: DeployFunction = async function ({ ethers, getNamedAccounts, deploym
 
   const { deployer } = await getNamedAccounts();
 
-  // const chainId = await getChainId();
-  // if (!process.env.WNATIVE_ADDRESS) {
-  //   throw Error(`No WNATIVE_ADDRESS for chain #!`);
-  // }
+  const chainId = await getChainId();
+  let wnativeAddress = process.env.WNATIVE_ADDRESS;
+  let nativeCurrencyLabel = "ETH";
+
+  if (chainId === "42220") {
+    // Celo Mainnet
+    wnativeAddress = "0x0000000000000000000000000000000000000000";
+    nativeCurrencyLabel = "CELO";
+  }
+
+  if (!wnativeAddress) {
+    throw Error(`No WNATIVE_ADDRESS for chain #${chainId}!`);
+  }
 
   function isAscii(str: string): boolean {
     return /^[\x00-\x7F]*$/.test(str);
@@ -26,21 +35,23 @@ const func: DeployFunction = async function ({ ethers, getNamedAccounts, deploym
 
   const NFTDescriptor = await deployments.get("NFTDescriptor");
 
-  const nativeCurrencyLabelBytes = ethers.utils.formatBytes32String("ETH");
+  const nativeCurrencyLabelBytes = asciiStringToBytes32(nativeCurrencyLabel);
 
   console.log(
     "Deploying NonfungibleTokenPositionDescriptor... ",
-    "native label byte",
+    "native label",
+    nativeCurrencyLabel,
+    "byte",
     nativeCurrencyLabelBytes,
     NFTDescriptor.address,
     {
-      args: [WNATIVE_ADDRESS, asciiStringToBytes32("ETH")],
+      args: [wnativeAddress, nativeCurrencyLabelBytes],
     },
   );
 
   await deploy("NonfungibleTokenPositionDescriptor", {
     from: deployer,
-    args: [WNATIVE_ADDRESS, asciiStringToBytes32("ETH")],
+    args: [wnativeAddress, nativeCurrencyLabelBytes],
     log: true,
     deterministicDeployment: false,
     libraries: {

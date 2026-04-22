@@ -17,13 +17,26 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
   const chainId = await getChainId();
 
   console.log({ chainId });
-  // if (!process.env.WNATIVE_ADDRESS) {
-  //   throw Error(`No WNATIVE_ADDRESS for chain #${chainId}!`);
-  // }
 
-  // if (!process.env.FACTORY_ADDRESS) {
-  //   throw Error(`No FACTORY_ADDRESS for chain #${chainId}!`);
-  // }
+  let factoryAddress = process.env.FACTORY_ADDRESS;
+  let wnativeAddress = process.env.WNATIVE_ADDRESS;
+
+  if (chainId === "42220") {
+    // Celo Mainnet
+    wnativeAddress = "0x0000000000000000000000000000000000000000";
+  }
+
+  // Fallback to deployments if not provided in env
+  if (!factoryAddress) {
+    const factoryDeployment = await deployments.getOrNull("UniswapV3Factory");
+    if (factoryDeployment) {
+      factoryAddress = factoryDeployment.address;
+    }
+  }
+
+  if (!factoryAddress || !wnativeAddress) {
+    throw Error(`No FACTORY_ADDRESS or WNATIVE_ADDRESS for chain #${chainId}!`);
+  }
 
   const swapRouterArtifact = await hre.artifacts.readArtifact("SwapRouter");
 
@@ -33,7 +46,7 @@ const func: DeployFunction = async function (hre: HardhatRuntimeEnvironment) {
       bytecode: swapRouterArtifact.bytecode,
       abi: swapRouterArtifact.abi,
     },
-    args: [FACTORY_ADDRESS, WNATIVE_ADDRESS],
+    args: [factoryAddress, wnativeAddress],
     log: true,
     deterministicDeployment: false,
   });

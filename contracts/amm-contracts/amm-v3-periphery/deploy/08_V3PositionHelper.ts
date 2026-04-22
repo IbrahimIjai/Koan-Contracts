@@ -19,6 +19,6 @@ HardhatRuntimeEnvironment) {
   });
 };
 
-func.tags = ["NFTDescriptor"];
+func.tags = ["V3PositionHelper"];
 
 export default func;

@@ -3,8 +3,6 @@ dotenv.config();
 import { HardhatUserConfig } from "hardhat/config";
 import "@nomicfoundation/hardhat-toolbox";
 import "hardhat-deploy";
-import "@matterlabs/hardhat-zksync-solc";
-import "@matterlabs/hardhat-zksync-verify";
 
 const providerApiKey = process.env.ALCHEMY_API_KEY || "oKxs-03sij-U_N0iOlrSsZFr29-IqbuF";
 const deployerPrivateKey = process.env.DEPLOYER_PRIVATE_KEY;
@@ -103,12 +101,36 @@ const config: HardhatUserConfig = {
       url: `https://eth-sepolia.g.alchemy.com/v2/${providerApiKey}`,
       accounts: [deployerPrivateKey!],
     },
+    celo: {
+      url: "https://forno.celo.org",
+      accounts: [deployerPrivateKey!],
+      chainId: 42220,
+      gasPrice: 80000000000,
+      verify: {
+        etherscan: {
+          apiKey: "123",
+          apiUrl: "https://celo.blockscout.com/api",
+        },
+      },
+    },
   },
   verify: {
     etherscan: {
-      // apiKey: `${etherscanApiKey}`,
       apiKey: "123",
     },
+  },
+  etherscan: {
+    apiKey: "123",
+    customChains: [
+      {
+        network: "celo",
+        chainId: 42220,
+        urls: {
+          apiURL: "https://celo.blockscout.com/api",
+          browserURL: "https://celoscan.io",
+        },
+      },
+    ],
   },
 };
 
